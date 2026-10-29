@@ -30,6 +30,8 @@ from PyQt5.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QFrame,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -37,6 +39,8 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QPushButton,
     QRadioButton,
+    QScrollArea,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -604,7 +608,7 @@ class BoardWidget(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumSize(560, 600)
+        self.setMinimumSize(320, 360)
         self.state = None
         self.selected = None
         self.targets = {}  # to -> path
@@ -796,6 +800,11 @@ class BoardWidget(QWidget):
         fm = painter.fontMetrics()
         widths = [24 + fm.horizontalAdvance(text) for _, text in items]
         total = sum(widths) + 18 * (len(items) - 1)
+        if total > self.width() - 12:
+            # 幅が足りなければ短い表記に切り替える
+            items = [(c, t.split(" (")[0] + " → " + t.split("→ ")[1].rstrip(")")) for c, t in items]
+            widths = [24 + fm.horizontalAdvance(text) for _, text in items]
+            total = sum(widths) + 18 * (len(items) - 1)
         x = (self.width() - total) / 2.0
         y = self.height() - 22
         for (color, text), w in zip(items, widths):
@@ -812,31 +821,51 @@ class BoardWidget(QWidget):
 # =============================================================================
 
 
+def available_geometry(widget=None):
+    """ウィジェットが表示される画面（無ければプライマリ画面）の作業領域を返す。"""
+    screen = None
+    if widget is not None and widget.windowHandle() is not None:
+        screen = widget.windowHandle().screen()
+    if screen is None:
+        screen = QApplication.primaryScreen()
+    return screen.availableGeometry()
+
+
 class StartDialog(QDialog):
     def __init__(self, parent=None, previous=None):
         super().__init__(parent)
         self.setWindowTitle("ダイヤモンドゲーム - ゲーム設定")
         self.setModal(True)
-        self.setMinimumWidth(600)
         prev = previous or GameConfig()
 
         root = QVBoxLayout(self)
-        title = QLabel("ダイヤモンドゲーム")
-        tf = title.font()
-        tf.setPointSize(18)
-        tf.setBold(True)
-        title.setFont(tf)
+        root.setContentsMargins(10, 8, 10, 8)
+        root.setSpacing(6)
+        title = QLabel(
+            "<span style='font-size:15pt; font-weight:bold; color:%s'>ダイヤモンドゲーム</span>"
+            "&nbsp;&nbsp;<span style='color:%s'>121ノード / 15駒ルール（Spec v1.2）</span>"
+            % (COLOR_TEXT_DARK, COLOR_TEXT_SUB)
+        )
         title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet("color:%s;" % COLOR_TEXT_DARK)
         root.addWidget(title)
-        sub = QLabel("121ノード / 15駒ルール（Spec v1.2）")
-        sub.setAlignment(Qt.AlignCenter)
-        sub.setStyleSheet("color:%s;" % COLOR_TEXT_SUB)
-        root.addWidget(sub)
+
+        # 設定項目はスクロールエリアに入れ、ボタンは常に最下部に固定する
+        body = QWidget()
+        grid = QGridLayout(body)
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setHorizontalSpacing(8)
+        grid.setVerticalSpacing(6)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setWidget(body)
+        root.addWidget(scroll, 1)
 
         # 1. 人数
         g1 = QGroupBox("1. プレイヤー人数")
-        h1 = QHBoxLayout(g1)
+        h1 = QVBoxLayout(g1)
+        h1.setContentsMargins(8, 4, 8, 6)
+        h1.setSpacing(2)
         self.rb2 = QRadioButton("2人対戦（緑 vs 黄）")
         self.rb3 = QRadioButton("3人対戦（緑 vs 水色 vs 橙）")
         grp = QButtonGroup(self)
@@ -845,11 +874,13 @@ class StartDialog(QDialog):
         (self.rb3 if prev.num_players == 3 else self.rb2).setChecked(True)
         h1.addWidget(self.rb2)
         h1.addWidget(self.rb3)
-        root.addWidget(g1)
+        grid.addWidget(g1, 0, 0)
 
         # 2. 割り当て
         g2 = QGroupBox("2. 各プレイヤーの割り当て")
         form = QFormLayout(g2)
+        form.setContentsMargins(8, 4, 8, 6)
+        form.setVerticalSpacing(4)
         self.combos = []
         self.combo_labels = []
         for i in range(3):
@@ -862,36 +893,41 @@ class StartDialog(QDialog):
             form.addRow(lab, cb)
             self.combos.append(cb)
             self.combo_labels.append(lab)
-        root.addWidget(g2)
+        grid.addWidget(g2, 1, 0)
 
         # 3. 難易度
         g3 = QGroupBox("3. AIの難易度")
         v3 = QVBoxLayout(g3)
-        self.rb_easy = QRadioButton("初級（Easy）: 貪欲法\n　ゴール方向へ最も進む手・最長ジャンプを優先")
-        self.rb_hard = QRadioButton("上級（Hard）: ミニマックス + アルファベータ枝刈り\n　探索深さ最大3手・ゴール距離／ジャンプ数／到達駒数で評価")
+        v3.setContentsMargins(8, 4, 8, 6)
+        v3.setSpacing(2)
+        self.rb_easy = QRadioButton("初級（Easy）: 貪欲法\n　前進・最長ジャンプを優先")
+        self.rb_hard = QRadioButton("上級（Hard）: ミニマックス\n　+ アルファベータ枝刈り（最大3手読み）")
         grp2 = QButtonGroup(self)
         grp2.addButton(self.rb_easy)
         grp2.addButton(self.rb_hard)
         (self.rb_easy if prev.difficulty == "easy" else self.rb_hard).setChecked(True)
         v3.addWidget(self.rb_easy)
         v3.addWidget(self.rb_hard)
-        root.addWidget(g3)
+        grid.addWidget(g3, 0, 1)
 
         # 4. ルールオプション
         g4 = QGroupBox("4. ルール")
         v4 = QVBoxLayout(g4)
-        self.chk_exit = QCheckBox("ゴール退出禁止（ゴールに入った駒は外へ出られない）")
+        v4.setContentsMargins(8, 4, 8, 6)
+        v4.setSpacing(2)
+        self.chk_exit = QCheckBox("ゴール退出禁止\n（ゴールに入った駒は外へ出られない）")
         self.chk_exit.setChecked(prev.forbid_goal_exit)
         v4.addWidget(self.chk_exit)
-        self.chk_spoil = QCheckBox("妨害防止ルール（ゴールが相手駒で塞がれていても、\n全15マスが埋まり自駒が1つ以上あれば勝利）")
+        self.chk_spoil = QCheckBox("妨害防止ルール\n（相手駒で塞がれても全15マスが埋まれば勝利）")
         self.chk_spoil.setChecked(prev.anti_spoil)
         v4.addWidget(self.chk_spoil)
-        note = QLabel("※ 人間の手番で5秒間操作しないと自動操作に切り替わります。\n"
-                      "　 自動操作中に盤面をクリックすると、以後はずっと手動操作になります。")
+        grid.addWidget(g4, 1, 1)
+        note = QLabel("※ 人間の手番で5秒間操作しないと自動操作に切り替わります。"
+                      "自動操作中に盤面をクリックすると、以後はずっと手動操作になります。")
         note.setStyleSheet("color:#555;")
         note.setWordWrap(True)
-        v4.addWidget(note)
-        root.addWidget(g4)
+        grid.addWidget(note, 2, 0, 1, 2)
+        grid.setRowStretch(3, 1)
 
         buttons = QDialogButtonBox()
         start = buttons.addButton("ゲーム開始", QDialogButtonBox.AcceptRole)
@@ -899,11 +935,23 @@ class StartDialog(QDialog):
         buttons.addButton("終了", QDialogButtonBox.RejectRole)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
-        root.addWidget(buttons)
+        root.addWidget(buttons, 0)
 
         self.rb2.toggled.connect(self._refresh)
         self.rb3.toggled.connect(self._refresh)
         self._refresh()
+        self._fit_to_screen(scroll, body)
+
+    def _fit_to_screen(self, scroll, body):
+        """画面の作業領域に収まるサイズで開く（はみ出す分はスクロール）。"""
+        avail = available_geometry(self)
+        body.adjustSize()
+        want_w = body.sizeHint().width() + scroll.verticalScrollBar().sizeHint().width() + 24
+        want_h = self.sizeHint().height()
+        w = min(want_w, int(avail.width() * 0.95))
+        h = min(want_h, int(avail.height() * 0.85))
+        self.resize(w, h)
+        self.move(avail.x() + (avail.width() - w) // 2, avail.y() + max(0, (avail.height() - h) // 2))
 
     def _refresh(self):
         n = 3 if self.rb3.isChecked() else 2
@@ -971,13 +1019,16 @@ class MainWindow(QMainWindow):
         tf.setPointSize(12)
         tf.setBold(True)
         self.timer_label.setFont(tf)
+        # 狭いウィンドウでもヘッダーが横にはみ出さないよう折り返しを許可
+        for lab in (self.turn_label, self.timer_label):
+            lab.setWordWrap(True)
+            lab.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         self.btn_pause = QPushButton("一時停止")
         self.btn_new = QPushButton("新しいゲーム（設定）")
         self.btn_pause.clicked.connect(self.toggle_pause)
         self.btn_new.clicked.connect(self.new_game_dialog)
-        header.addWidget(self.turn_label)
-        header.addStretch(1)
-        header.addWidget(self.timer_label)
+        header.addWidget(self.turn_label, 3)
+        header.addWidget(self.timer_label, 2)
         header.addSpacing(16)
         header.addWidget(self.btn_pause)
         header.addWidget(self.btn_new)
@@ -997,7 +1048,12 @@ class MainWindow(QMainWindow):
         self.anim_timer.setInterval(16)
         self.anim_timer.timeout.connect(self.on_anim_tick)
 
-        self.resize(760, 860)
+        # 画面の作業領域（タスクバー除く）の 90% 以内に収める
+        avail = available_geometry(self)
+        h = min(860, int(avail.height() * 0.9))
+        w = min(760, int(avail.width() * 0.9), max(640, int(h * 0.9)))
+        self.resize(w, h)
+        self.move(avail.x() + (avail.width() - w) // 2, avail.y() + (avail.height() - h) // 2)
 
     # ---------------- ゲーム開始 ----------------
     def new_game_dialog(self):

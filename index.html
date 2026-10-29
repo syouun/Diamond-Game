@@ -2,7 +2,11 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#f3ede2">
   <title>ダイヤモンドゲーム (Chinese Checkers) - 15駒ルール</title>
   <style>
     :root {
@@ -25,6 +29,16 @@
       padding: 0;
       user-select: none;
       -webkit-user-select: none;
+      /* iPhone: 長押しメニュー・拡大鏡・タップ時のハイライトを無効化 */
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html {
+      height: 100%;
+      background-color: var(--bg-color);
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
     }
 
     body {
@@ -34,17 +48,28 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      min-height: 100vh;
+      /* iOS Safari のアドレスバー出入りに追従する Dynamic Viewport 基準 */
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      overscroll-behavior: none;
+      /* ダブルタップ拡大を防止 */
       touch-action: manipulation;
+      /* ノッチ / Dynamic Island / ホームバー対策 */
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      padding-left: env(safe-area-inset-left, 0px);
+      padding-right: env(safe-area-inset-right, 0px);
     }
 
     header {
       width: 100%;
       max-width: 800px;
-      padding: 12px 16px;
+      padding: 12px 16px 8px;
       display: flex;
       flex-direction: column;
       gap: 8px;
+      flex: 0 0 auto;
     }
 
     .top-bar {
@@ -138,7 +163,8 @@
     .main-container {
       width: 100%;
       max-width: 800px;
-      flex: 1;
+      flex: 1 1 auto;
+      min-height: 0;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -146,10 +172,21 @@
       position: relative;
     }
 
+    /* 盤面エリア: 残りの高さをすべて使い、盤面はその中に縦横比を保って収める（サイズはJSで計算） */
+    .board-area {
+      flex: 1 1 auto;
+      min-height: 0;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
     .canvas-container {
       width: 100%;
       max-width: 680px;
       aspect-ratio: 1 / 1.08;
+      flex: 0 0 auto;
       position: relative;
       background: var(--board-bg);
       border-radius: 16px;
@@ -162,10 +199,15 @@
       width: 100%;
       height: 100%;
       display: block;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
     }
 
     .status-bar {
-      margin-top: 10px;
+      flex: 0 0 auto;
+      margin-top: 8px;
       width: 100%;
       max-width: 680px;
       padding: 8px 14px;
@@ -192,7 +234,8 @@
       align-items: center;
       justify-content: center;
       z-index: 1000;
-      padding: 16px;
+      padding: calc(12px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px))
+               calc(12px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px));
     }
 
     .modal-overlay.active {
@@ -206,8 +249,12 @@
       border-radius: 16px;
       padding: 24px;
       box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-      max-height: 90vh;
+      max-height: 85vh;
+      max-height: 85dvh;
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      touch-action: pan-y;
     }
 
     .modal-title {
@@ -284,6 +331,17 @@
       margin-top: 24px;
     }
 
+    /* 設定モーダルの「ゲーム開始」はスクロールしても常に下端に表示 */
+    #settings-modal .modal-actions {
+      position: sticky;
+      bottom: -24px;
+      margin: 16px -24px -24px;
+      padding: 12px 24px;
+      background: #ffffff;
+      border-top: 1px solid var(--border);
+      border-radius: 0 0 16px 16px;
+    }
+
     .note-text {
       font-size: 0.8rem;
       color: #64748b;
@@ -292,16 +350,75 @@
     }
 
     @media (max-width: 600px) {
+      header {
+        padding: 6px 8px 6px;
+      }
       .top-bar {
-        flex-direction: column;
-        gap: 8px;
-        align-items: stretch;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-areas:
+          "turn turn"
+          "timer buttons";
+        gap: 6px 8px;
+        align-items: center;
+        padding: 8px 10px;
       }
       .turn-badge {
-        justify-content: space-between;
+        grid-area: turn;
+        font-size: 0.85rem;
+      }
+      #timer-badge {
+        grid-area: timer;
+        justify-self: start;
+        font-size: 0.8rem;
       }
       .button-group {
+        grid-area: buttons;
         justify-content: flex-end;
+        gap: 6px;
+      }
+      button {
+        font-size: 0.82rem;
+        padding: 7px 10px;
+        min-height: 36px;
+      }
+      .main-container {
+        padding: 0 6px 6px;
+      }
+      .status-bar {
+        margin-top: 6px;
+        padding: 6px 10px;
+        font-size: 0.78rem;
+        min-height: 30px;
+      }
+      .modal-card {
+        padding: 16px;
+      }
+      #settings-modal .modal-actions {
+        bottom: -16px;
+        margin: 12px -16px -16px;
+        padding: 10px 16px;
+      }
+      .modal-actions button {
+        flex: 1;
+        min-height: 44px;
+      }
+      .modal-title {
+        font-size: 1.2rem;
+      }
+      .modal-subtitle {
+        margin-bottom: 12px;
+      }
+      .form-group {
+        margin-bottom: 10px;
+        padding: 10px 12px;
+      }
+      .player-assign-row {
+        gap: 8px;
+        font-size: 0.85rem;
+      }
+      select {
+        font-size: 16px; /* iOS の入力時自動ズームを防止 */
       }
     }
   </style>
@@ -323,8 +440,10 @@
   </header>
 
   <main class="main-container">
-    <div class="canvas-container" id="canvas-wrapper">
-      <canvas id="game-canvas"></canvas>
+    <div class="board-area" id="board-area">
+      <div class="canvas-container" id="canvas-wrapper">
+        <canvas id="game-canvas"></canvas>
+      </div>
     </div>
     <div class="status-bar" id="status-bar">
       ゲームを開始してください。
@@ -1013,8 +1132,19 @@
         this.STALL_PLIES_PER_PLAYER = 30;
 
         this.initEvents();
+        this.boardArea = document.getElementById("board-area");
         this.resizeCanvas();
-        window.addEventListener("resize", () => this.resizeCanvas());
+        const onResize = () => this.scheduleResize();
+        window.addEventListener("resize", onResize);
+        window.addEventListener("orientationchange", onResize);
+        if (window.visualViewport) {
+          window.visualViewport.addEventListener("resize", onResize);
+        }
+        if (window.ResizeObserver) {
+          new ResizeObserver(onResize).observe(this.boardArea);
+        }
+        // iOS: ジェスチャー（ピンチ）によるページ拡大を抑止
+        document.addEventListener("gesturestart", (e) => e.preventDefault(), { passive: false });
 
         this.openSettingsModal();
       }
@@ -1024,7 +1154,11 @@
         this.btnNewGame.addEventListener("click", () => this.openSettingsModal());
 
         this.btnCancelSettings.addEventListener("click", () => {
-          if (this.state) this.settingsModal.classList.remove("active");
+          this.settingsModal.classList.remove("active");
+          if (!this.state) {
+            // 初回起動時（ゲーム未開始）はデフォルト設定で開始する
+            this.startGame();
+          }
         });
 
         this.btnStartGame.addEventListener("click", () => {
@@ -1087,7 +1221,12 @@
       }
 
       openSettingsModal() {
+        // 初回はキャンセルで戻る先のゲームが無いので非表示、対局中は「現在のゲームに戻る」
+        this.btnCancelSettings.style.display = this.state ? "" : "none";
+        this.btnCancelSettings.textContent = "キャンセル（ゲームに戻る）";
         this.settingsModal.classList.add("active");
+        const card = this.settingsModal.querySelector(".modal-card");
+        if (card) card.scrollTop = 0;
       }
 
       readSettingsForm() {
@@ -1112,8 +1251,23 @@
         };
       }
 
+      scheduleResize() {
+        if (this._resizeRaf) return;
+        this._resizeRaf = requestAnimationFrame(() => {
+          this._resizeRaf = null;
+          this.resizeCanvas();
+        });
+      }
+
       resizeCanvas() {
         const dpr = window.devicePixelRatio || 1;
+        // 盤面エリアの残り高さに収まるよう、縦横比 1 : 1.08 を保って盤面サイズを決める
+        const area = this.boardArea.getBoundingClientRect();
+        const ratio = 1.08;
+        const boxW = Math.max(160, Math.floor(Math.min(area.width, area.height / ratio, 680)));
+        const boxH = Math.floor(boxW * ratio);
+        this.wrapper.style.width = boxW + "px";
+        this.wrapper.style.height = boxH + "px";
         const rect = this.wrapper.getBoundingClientRect();
         this.canvas.width = Math.round(rect.width * dpr);
         this.canvas.height = Math.round(rect.height * dpr);
