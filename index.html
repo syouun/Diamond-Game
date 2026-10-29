@@ -1,0 +1,1802 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ダイヤモンドゲーム (Chinese Checkers) - 15駒ルール</title>
+  <style>
+    :root {
+      --bg-color: #f3ede2;
+      --board-bg: #d9bea2;
+      --card-bg: #ffffff;
+      --text-main: #2e1a0f;
+      --text-sub: #5c3a21;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --danger: #dc2626;
+      --warning: #d97706;
+      --success: #16a34a;
+      --border: #e2d7c7;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      font-family: 'Hiragino Sans', 'Meiryo UI', 'Segoe UI', system-ui, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      touch-action: manipulation;
+    }
+
+    header {
+      width: 100%;
+      max-width: 800px;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--card-bg);
+      padding: 10px 16px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    .turn-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: bold;
+      font-size: 0.95rem;
+    }
+
+    .player-indicator-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      display: inline-block;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+
+    .timer-badge {
+      font-weight: bold;
+      font-size: 0.9rem;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: #f1f5f9;
+      color: #475569;
+    }
+
+    .timer-badge.warning {
+      background: #fef2f2;
+      color: var(--danger);
+      animation: pulse 1s infinite alternate;
+    }
+
+    .timer-badge.auto-mode {
+      background: #fffbeb;
+      color: var(--warning);
+    }
+
+    @keyframes pulse {
+      from { opacity: 0.8; }
+      to { opacity: 1; transform: scale(1.03); }
+    }
+
+    .button-group {
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 600;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      color: var(--text-main);
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    button:hover {
+      background: #f8fafc;
+      border-color: #cbd5e1;
+    }
+
+    button.btn-primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #ffffff;
+    }
+
+    button.btn-primary:hover {
+      background: var(--primary-hover);
+    }
+
+    .main-container {
+      width: 100%;
+      max-width: 800px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 12px 12px;
+      position: relative;
+    }
+
+    .canvas-container {
+      width: 100%;
+      max-width: 680px;
+      aspect-ratio: 1 / 1.08;
+      position: relative;
+      background: var(--board-bg);
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(75, 46, 31, 0.15), 0 2px 6px rgba(0, 0, 0, 0.08);
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .status-bar {
+      margin-top: 10px;
+      width: 100%;
+      max-width: 680px;
+      padding: 8px 14px;
+      background: var(--card-bg);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      color: var(--text-sub);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+      min-height: 36px;
+      display: flex;
+      align-items: center;
+    }
+
+    /* モーダルスタイル */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(3px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 16px;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-card {
+      background: #ffffff;
+      width: 100%;
+      max-width: 540px;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal-title {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: var(--text-main);
+      text-align: center;
+      margin-bottom: 4px;
+    }
+
+    .modal-subtitle {
+      font-size: 0.85rem;
+      color: var(--text-sub);
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .form-group {
+      margin-bottom: 18px;
+      border: 1px solid var(--border);
+      padding: 14px 16px;
+      border-radius: 12px;
+      background: #faf7f2;
+    }
+
+    .form-group legend {
+      font-weight: 700;
+      font-size: 0.95rem;
+      padding: 0 6px;
+      color: var(--text-main);
+    }
+
+    .radio-row, .checkbox-row {
+      display: flex;
+      gap: 16px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+
+    .radio-label, .checkbox-label {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    .radio-label input, .checkbox-label input {
+      margin-top: 3px;
+    }
+
+    .player-assign-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      font-size: 0.9rem;
+    }
+
+    select {
+      font-family: inherit;
+      font-size: 0.9rem;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      outline: none;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .note-text {
+      font-size: 0.8rem;
+      color: #64748b;
+      margin-top: 8px;
+      line-height: 1.4;
+    }
+
+    @media (max-width: 600px) {
+      .top-bar {
+        flex-direction: column;
+        gap: 8px;
+        align-items: stretch;
+      }
+      .turn-badge {
+        justify-content: space-between;
+      }
+      .button-group {
+        justify-content: flex-end;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="top-bar">
+      <div class="turn-badge">
+        <span class="player-indicator-dot" id="turn-dot" style="background-color: #1d4ed8;"></span>
+        <span id="turn-text">手番: P1 (青) — 1手目</span>
+      </div>
+      <div id="timer-badge" class="timer-badge">手動操作モード</div>
+      <div class="button-group">
+        <button id="btn-pause">一時停止</button>
+        <button id="btn-new-game" class="btn-primary">新しいゲーム</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-container">
+    <div class="canvas-container" id="canvas-wrapper">
+      <canvas id="game-canvas"></canvas>
+    </div>
+    <div class="status-bar" id="status-bar">
+      ゲームを開始してください。
+    </div>
+  </main>
+
+  <!-- 設定モーダル -->
+  <div class="modal-overlay" id="settings-modal">
+    <div class="modal-card">
+      <h2 class="modal-title">ダイヤモンドゲーム</h2>
+      <p class="modal-subtitle">121ノード / 15駒ルール (Spec v1.2)</p>
+
+      <fieldset class="form-group">
+        <legend>1. プレイヤー人数</legend>
+        <div class="radio-row">
+          <label class="radio-label">
+            <input type="radio" name="num-players" value="2" checked>
+            <span>2人対戦 (緑 vs 黄)</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="num-players" value="3">
+            <span>3人対戦 (緑 vs 水色 vs 橙)</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="form-group">
+        <legend>2. 各プレイヤーの割り当て</legend>
+        <div id="player-assign-container">
+          <div class="player-assign-row" id="row-p1">
+            <span>Player 1 (青駒 / 緑陣地):</span>
+            <select id="kind-p1">
+              <option value="human">人間 (あなた)</option>
+              <option value="ai">AI</option>
+            </select>
+          </div>
+          <div class="player-assign-row" id="row-p2">
+            <span>Player 2 (赤駒 / 黄陣地):</span>
+            <select id="kind-p2">
+              <option value="human">人間</option>
+              <option value="ai" selected>AI</option>
+            </select>
+          </div>
+          <div class="player-assign-row" id="row-p3" style="display: none;">
+            <span>Player 3 (緑駒 / 橙陣地):</span>
+            <select id="kind-p3">
+              <option value="human">人間</option>
+              <option value="ai" selected>AI</option>
+            </select>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset class="form-group">
+        <legend>3. AIの難易度</legend>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <label class="radio-label">
+            <input type="radio" name="difficulty" value="easy">
+            <span><strong>初級 (Easy)</strong>: 貪欲法（ゴール前進・最長ジャンプ優先）</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="difficulty" value="hard" checked>
+            <span><strong>上級 (Hard)</strong>: ミニマックス＋αβ枝刈り（最大3手読み・局面評価）</span>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="form-group">
+        <legend>4. ルール</legend>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <label class="checkbox-label">
+            <input type="checkbox" id="chk-exit" checked>
+            <span>ゴール退出禁止（ゴールに入った駒は外へ出られない）</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="chk-anti-spoil">
+            <span>妨害防止ルール（ゴールが塞がれていても全15マスが埋まり自駒があれば勝利）</span>
+          </label>
+        </div>
+        <p class="note-text">
+          ※ 人間の手番で5秒間操作しないと自動操作（上級AI代打ち）に切り替わります。<br>
+          　 自動操作中に盤面をクリックすると、以後は手動操作のままになります。
+        </p>
+      </fieldset>
+
+      <div class="modal-actions">
+        <button id="btn-cancel-settings">キャンセル</button>
+        <button id="btn-start-game" class="btn-primary">ゲーム開始</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ゲーム終了モーダル -->
+  <div class="modal-overlay" id="gameover-modal">
+    <div class="modal-card" style="text-align: center;">
+      <h2 class="modal-title" id="gameover-title">ゲーム終了</h2>
+      <p class="modal-subtitle" id="gameover-msg" style="font-size: 1.1rem; margin: 20px 0;"></p>
+      <div class="modal-actions" style="justify-content: center;">
+        <button id="btn-gameover-close">閉じる</button>
+        <button id="btn-gameover-restart" class="btn-primary">もう一度遊ぶ</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* =============================================================================
+     * ダイヤモンドゲーム (Chinese Checkers) - JavaScript 完全実装
+     * ============================================================================= */
+
+    const HEX_R = 4;
+    const CAMP_L = 4;
+    const SQRT3_2 = Math.sqrt(3) / 2.0;
+
+    const AXES = ["x", "y", "z"];
+    const AXIS_INDEX = { x: 0, y: 1, z: 2 };
+
+    const DIRECTIONS = [
+      [1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]
+    ];
+    const EDGE_DIRECTIONS = [
+      [1, 0], [0, 1], [1, -1]
+    ];
+
+    const CAMP_KEYS = [
+      ["x", 1], ["z", -1], ["y", 1], ["x", -1], ["z", 1], ["y", -1]
+    ];
+
+    const CAMP_COLORS = {
+      "x,1": "#7dd3fc",   // 水色
+      "z,-1": "#d946ef",  // 紫
+      "y,1": "#22c55e",   // 緑 (P1初期陣地)
+      "x,-1": "#ef4444",  // 赤
+      "z,1": "#f59e0b",   // 橙
+      "y,-1": "#fde047"   // 黄 (P2初期陣地)
+    };
+
+    const CAMP_NAMES = {
+      "x,1": "水色",
+      "z,-1": "紫",
+      "y,1": "緑",
+      "x,-1": "赤",
+      "z,1": "橙",
+      "y,-1": "黄"
+    };
+
+    const COLOR_BG = "#d9bea2";
+    const COLOR_HEX = "#ffffff";
+    const COLOR_EDGE = "#333333";
+    const COLOR_NODE = "#4b2e1f";
+
+    const PIECE_COLORS = ["#1d4ed8", "#b91c1c", "#16a34a"]; // P1 青 / P2 赤 / P3 緑
+    const PIECE_COLOR_NAMES = ["青", "赤", "緑"];
+
+    const PLAYER_CAMPS = {
+      2: [["y", 1], ["y", -1]],
+      3: [["y", 1], ["x", 1], ["z", 1]]
+    };
+
+    function campKeyStr(k) { return `${k[0]},${k[1]}`; }
+    function cubeOf(q, r) { return [q, -q - r, r]; }
+    function axialOfCube(x, y, z) { return [x, z]; }
+    function hexDistance(a, b) {
+      return (Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2])) / 2.0;
+    }
+
+    function inHexagon(q, r) {
+      return Math.max(Math.abs(q), Math.abs(r), Math.abs(-q - r)) <= HEX_R;
+    }
+
+    function inCamp(q, r, key) {
+      const [axis, sign] = key;
+      const c = cubeOf(q, r);
+      const ai = AXIS_INDEX[axis];
+      if (sign * c[ai] <= HEX_R) return false;
+      for (let i = 0; i < 3; i++) {
+        if (i !== ai && sign * c[i] < -HEX_R) return false;
+      }
+      return true;
+    }
+
+    function campOf(q, r) {
+      for (const k of CAMP_KEYS) {
+        if (inCamp(q, r, k)) return k;
+      }
+      return null;
+    }
+
+    function opposite(key) {
+      return [key[0], -key[1]];
+    }
+
+    class Geometry {
+      constructor() {
+        this.nodes = [];
+        this.index = new Map();
+        for (let q = -8; q <= 8; q++) {
+          for (let r = -8; r <= 8; r++) {
+            if (inHexagon(q, r) || campOf(q, r) !== null) {
+              const idx = this.nodes.length;
+              this.nodes.push([q, r]);
+              this.index.set(`${q},${r}`, idx);
+            }
+          }
+        }
+        this.n = this.nodes.length; // 121
+        this.cube = this.nodes.map(([q, r]) => cubeOf(q, r));
+        this.camp = this.nodes.map(([q, r]) => campOf(q, r));
+
+        this.neigh = Array.from({ length: this.n }, () => []);
+        this.jumps = Array.from({ length: this.n }, () => []);
+
+        for (let i = 0; i < this.n; i++) {
+          const [q, r] = this.nodes[i];
+          for (const [dq, dr] of DIRECTIONS) {
+            const nb = this.index.get(`${q + dq},${r + dr}`);
+            if (nb !== undefined) {
+              this.neigh[i].push(nb);
+              const land = this.index.get(`${q + 2 * dq},${r + 2 * dr}`);
+              if (land !== undefined) {
+                this.jumps[i].push([nb, land]);
+              }
+            }
+          }
+        }
+
+        this.edges = [];
+        for (let i = 0; i < this.n; i++) {
+          const [q, r] = this.nodes[i];
+          for (const [dq, dr] of EDGE_DIRECTIONS) {
+            const j = this.index.get(`${q + dq},${r + dr}`);
+            if (j !== undefined) {
+              this.edges.push([i, j]);
+            }
+          }
+        }
+
+        this.camp_nodes = {};
+        this.base_edge = {};
+        for (const key of CAMP_KEYS) {
+          const kStr = campKeyStr(key);
+          const [axis, sign] = key;
+          const ai = AXIS_INDEX[axis];
+
+          this.camp_nodes[kStr] = [];
+          this.base_edge[kStr] = [];
+          for (let i = 0; i < this.n; i++) {
+            if (this.camp[i] && campKeyStr(this.camp[i]) === kStr) {
+              this.camp_nodes[kStr].push(i);
+            }
+            if (this.camp[i] === null && sign * this.cube[i][ai] === HEX_R) {
+              this.base_edge[kStr].push(i);
+            }
+          }
+        }
+      }
+
+      region15(key) {
+        const kStr = campKeyStr(key);
+        return [...this.camp_nodes[kStr], ...this.base_edge[kStr]];
+      }
+
+      static toXY(q, r, scale) {
+        return [(q + r / 2.0) * scale, SQRT3_2 * r * scale];
+      }
+
+      static hexagonCorners() {
+        return [[4, 0], [4, -4], [0, -4], [-4, 0], [-4, 4], [0, 4]];
+      }
+
+      static campTriangle(key) {
+        const [axis, sign] = key;
+        const ai = AXIS_INDEX[axis];
+        const others = [0, 1, 2].filter(i => i !== ai);
+        const pts = [];
+        for (const [a, b] of [[0, -4], [-4, 0]]) {
+          const c = [0, 0, 0];
+          c[ai] = 4 * sign;
+          c[others[0]] = a * sign;
+          c[others[1]] = b * sign;
+          pts.push(axialOfCube(...c));
+        }
+        const c = [0, 0, 0];
+        c[ai] = 8 * sign;
+        c[others[0]] = -4 * sign;
+        c[others[1]] = -4 * sign;
+        pts.push(axialOfCube(...c));
+        return pts;
+      }
+    }
+
+    const GEO = new Geometry();
+
+    class PlayerInfo {
+      constructor(idx, startKey) {
+        this.idx = idx;
+        this.startKey = startKey;
+        this.goalKey = opposite(startKey);
+        this.start = GEO.region15(startKey);
+        this.startSet = new Set(this.start);
+        this.goal = new Set(GEO.region15(this.goalKey));
+
+        const [goalAxis, goalSign] = this.goalKey;
+        this.goalAxis = AXIS_INDEX[goalAxis];
+        this.goalSign = goalSign;
+
+        const cs = Array.from(this.goal).map(i => GEO.cube[i]);
+        this.centroid = [0, 1, 2].map(k => cs.reduce((sum, c) => sum + c[k], 0) / cs.length);
+
+        this.progress = [];
+        this.dist = [];
+        this.value = [];
+        for (let i = 0; i < GEO.n; i++) {
+          const prog = goalSign * GEO.cube[i][this.goalAxis];
+          const d = hexDistance(GEO.cube[i], this.centroid);
+          this.progress.push(prog);
+          this.dist.push(d);
+          if (this.goal.has(i)) {
+            this.value.push(14.0 + 1.0 * prog);
+          } else {
+            this.value.push(1.0 * prog - 1.3 * d);
+          }
+        }
+      }
+    }
+
+    function isWinner(board, pos, players, p, antiSpoil = false) {
+      const goal = players[p].goal;
+      let mine = 0;
+      for (const node of pos[p]) {
+        if (goal.has(node)) mine++;
+      }
+      if (mine === goal.size) return true;
+      if (antiSpoil && mine > 0) {
+        for (const n of goal) {
+          if (board[n] === -1) return false;
+        }
+        return true;
+      }
+      return false;
+    }
+
+    function generateMoves(board, posP, goal, forbidExit, withPaths = false) {
+      const moves = [];
+      const neigh = GEO.neigh;
+      const jumps = GEO.jumps;
+
+      for (const f of posP) {
+        const locked = forbidExit && goal.has(f);
+        const dests = new Map();
+
+        for (const nb of neigh[f]) {
+          if (board[nb] === -1 && (!locked || goal.has(nb))) {
+            dests.set(nb, withPaths ? [f, nb] : null);
+          }
+        }
+
+        const owner = board[f];
+        board[f] = -1;
+        const parent = new Map();
+        parent.set(f, null);
+        const stack = [f];
+
+        while (stack.length > 0) {
+          const c = stack.pop();
+          for (const [over, land] of jumps[c]) {
+            if (board[over] !== -1 && board[land] === -1 && !parent.has(land)) {
+              parent.set(land, c);
+              stack.push(land);
+            }
+          }
+        }
+        board[f] = owner;
+
+        for (const [land, par] of parent.entries()) {
+          if (land === f || dests.has(land)) continue;
+          if (locked && !goal.has(land)) continue;
+          if (withPaths) {
+            const path = [];
+            let curr = land;
+            while (curr !== null) {
+              path.push(curr);
+              curr = parent.get(curr);
+            }
+            path.reverse();
+            dests.set(land, path);
+          } else {
+            dests.set(land, null);
+          }
+        }
+
+        for (const [t, path] of dests.entries()) {
+          moves.push([f, t, path]);
+        }
+      }
+      return moves;
+    }
+
+    class AIEngine {
+      constructor(players, forbidExit, difficulty, antiSpoil = false, timeLimit = 1.5, maxDepth = 3, beam = 12) {
+        this.players = players;
+        this.forbidExit = forbidExit;
+        this.antiSpoil = antiSpoil;
+        this.othersWeight = players.length === 2 ? 1.0 : 0.5;
+        this.difficulty = difficulty;
+        this.timeLimit = timeLimit;
+        this.maxDepth = maxDepth;
+        this.beam = beam;
+        this.WIN_SCORE = 100000.0;
+        this.deadline = 0;
+        this.nodes = 0;
+      }
+
+      playerScore(board, pos, i) {
+        const p = this.players[i];
+        const val = p.value;
+        let s = 0.0;
+        let worst = 0.0;
+        let inGoal = 0;
+        let inStart = 0;
+
+        for (const n of pos[i]) {
+          s += val[n];
+          if (p.goal.has(n)) {
+            inGoal++;
+          } else {
+            const d = p.dist[n];
+            if (d > worst) worst = d;
+          }
+          if (p.startSet.has(n)) inStart++;
+        }
+
+        s -= 1.5 * worst;
+        s -= 2.0 * inStart;
+        s += 3.0 * inGoal;
+
+        let jumps = 0;
+        for (const n of pos[i]) {
+          const vn = val[n];
+          for (const [over, land] of GEO.jumps[n]) {
+            if (board[over] !== -1 && board[land] === -1 && val[land] > vn) {
+              jumps++;
+            }
+          }
+        }
+        s += 0.3 * Math.min(jumps, 15);
+        return s;
+      }
+
+      evaluate(board, pos, me) {
+        const mine = this.playerScore(board, pos, me);
+        let othersSum = 0;
+        let count = 0;
+        for (let i = 0; i < this.players.length; i++) {
+          if (i !== me) {
+            othersSum += this.playerScore(board, pos, i);
+            count++;
+          }
+        }
+        return mine - this.othersWeight * (othersSum / count);
+      }
+
+      choose(board, pos, me, lastMove = null) {
+        const b = board.slice();
+        const p = pos.map(s => new Set(s));
+        const moves = generateMoves(b, p[me], this.players[me].goal, this.forbidExit, true);
+        if (moves.length === 0) return null;
+
+        // 即勝ち手
+        for (const [f, t, path] of moves) {
+          p[me].delete(f);
+          p[me].add(t);
+          b[f] = -1;
+          b[t] = me;
+          const win = isWinner(b, p, this.players, me, this.antiSpoil);
+          b[t] = -1;
+          b[f] = me;
+          p[me].delete(t);
+          p[me].add(f);
+          if (win) return [f, t, path];
+        }
+
+        if (this.difficulty === "easy") {
+          return this.chooseGreedy(moves, me, lastMove);
+        }
+        return this.chooseAlphaBeta(b, p, me, moves, lastMove);
+      }
+
+      chooseGreedy(moves, me, lastMove) {
+        const player = this.players[me];
+        let best = null;
+        let bestScore = -1e18;
+        for (const [f, t, path] of moves) {
+          const gain = player.value[t] - player.value[f];
+          const hops = (path && path.length > 2) ? path.length - 1 : 0;
+          const rear = player.goal.has(f) ? 0.0 : player.dist[f];
+          let score = gain * 10.0 + hops * 1.5 + rear * 0.8 + Math.random() * 0.8;
+          if (lastMove && lastMove[2] === f && lastMove[1] === t) {
+            score -= 30.0;
+          }
+          if (score > bestScore) {
+            bestScore = score;
+            best = [f, t, path];
+          }
+        }
+        return best;
+      }
+
+      orderKey(mover, f, t) {
+        const v = this.players[mover].value;
+        return v[t] - v[f];
+      }
+
+      chooseAlphaBeta(board, pos, me, moves, lastMove) {
+        this.deadline = performance.now() + this.timeLimit * 1000;
+        this.nodes = 0;
+        const nPlayers = this.players.length;
+
+        const rootBias = (f, t) => {
+          let b = Math.random() * 0.05;
+          if (lastMove && lastMove[2] === f && lastMove[1] === t) b -= 5.0;
+          return b;
+        };
+
+        moves.sort((a, b) => this.orderKey(me, b[0], b[1]) - this.orderKey(me, a[0], a[1]));
+        const bias = new Map();
+        for (const [f, t] of moves) {
+          bias.set(`${f},${t}`, rootBias(f, t));
+        }
+
+        let bestMove = moves[0];
+        for (let depth = 1; depth <= this.maxDepth; depth++) {
+          try {
+            let alpha = -1e18;
+            let curBest = null;
+            let curVal = -1e18;
+
+            for (const [f, t, path] of moves) {
+              this._do(board, pos, me, f, t);
+              let v = 0;
+              try {
+                if (isWinner(board, pos, this.players, me, this.antiSpoil)) {
+                  v = this.WIN_SCORE + depth;
+                } else {
+                  v = this.alphabeta(board, pos, depth - 1, alpha, 1e18, (me + 1) % nPlayers, me);
+                }
+              } finally {
+                this._undo(board, pos, me, f, t);
+              }
+              v += bias.get(`${f},${t}`) || 0;
+              if (v > curVal) {
+                curVal = v;
+                curBest = [f, t, path];
+              }
+              if (v > alpha) alpha = v;
+            }
+
+            if (curBest) {
+              bestMove = curBest;
+              const idx = moves.indexOf(curBest);
+              if (idx > 0) {
+                moves.splice(idx, 1);
+                moves.unshift(curBest);
+              }
+            }
+          } catch (e) {
+            if (e === "Timeout") break;
+            throw e;
+          }
+        }
+        return bestMove;
+      }
+
+      alphabeta(board, pos, depth, alpha, beta, mover, me) {
+        this.nodes++;
+        if ((this.nodes & 255) === 0 && performance.now() > this.deadline) {
+          throw "Timeout";
+        }
+        if (depth === 0) {
+          return this.evaluate(board, pos, me);
+        }
+        const nPlayers = this.players.length;
+        const moves = generateMoves(board, pos[mover], this.players[mover].goal, this.forbidExit, false);
+        if (moves.length === 0) {
+          return this.alphabeta(board, pos, depth - 1, alpha, beta, (mover + 1) % nPlayers, me);
+        }
+
+        moves.sort((a, b) => this.orderKey(mover, b[0], b[1]) - this.orderKey(mover, a[0], a[1]));
+        const beamMoves = moves.slice(0, this.beam);
+        const maximizing = mover === me;
+        let best = maximizing ? -1e18 : 1e18;
+
+        for (const [f, t] of beamMoves) {
+          this._do(board, pos, mover, f, t);
+          let v = 0;
+          try {
+            if (isWinner(board, pos, this.players, mover, this.antiSpoil)) {
+              v = maximizing ? (this.WIN_SCORE + depth) : -(this.WIN_SCORE + depth);
+            } else {
+              v = this.alphabeta(board, pos, depth - 1, alpha, beta, (mover + 1) % nPlayers, me);
+            }
+          } finally {
+            this._undo(board, pos, mover, f, t);
+          }
+
+          if (maximizing) {
+            if (v > best) best = v;
+            if (best > alpha) alpha = best;
+          } else {
+            if (v < best) best = v;
+            if (best < beta) beta = best;
+          }
+          if (alpha >= beta) break;
+        }
+        return best;
+      }
+
+      _do(board, pos, p, f, t) {
+        board[f] = -1;
+        board[t] = p;
+        pos[p].delete(f);
+        pos[p].add(t);
+      }
+
+      _undo(board, pos, p, f, t) {
+        board[t] = -1;
+        board[f] = p;
+        pos[p].delete(t);
+        pos[p].add(f);
+      }
+    }
+
+    /* =============================================================================
+     * ゲームコントローラー & UI管理
+     * ============================================================================= */
+
+    class DiamondGameApp {
+      constructor() {
+        this.canvas = document.getElementById("game-canvas");
+        this.ctx = this.canvas.getContext("2d");
+        this.wrapper = document.getElementById("canvas-wrapper");
+
+        this.statusBar = document.getElementById("status-bar");
+        this.turnDot = document.getElementById("turn-dot");
+        this.turnText = document.getElementById("turn-text");
+        this.timerBadge = document.getElementById("timer-badge");
+        this.btnPause = document.getElementById("btn-pause");
+        this.btnNewGame = document.getElementById("btn-new-game");
+
+        // モーダル要素
+        this.settingsModal = document.getElementById("settings-modal");
+        this.btnStartGame = document.getElementById("btn-start-game");
+        this.btnCancelSettings = document.getElementById("btn-cancel-settings");
+        this.gameoverModal = document.getElementById("gameover-modal");
+        this.gameoverTitle = document.getElementById("gameover-title");
+        this.gameoverMsg = document.getElementById("gameover-msg");
+        this.btnGameoverClose = document.getElementById("btn-gameover-close");
+        this.btnGameoverRestart = document.getElementById("btn-gameover-restart");
+
+        this.config = {
+          numPlayers: 2,
+          kinds: ["human", "ai"],
+          difficulty: "hard",
+          forbidGoalExit: true,
+          antiSpoil: false
+        };
+
+        this.state = null;
+        this.engines = [];
+        this.autoMode = [];
+        this.manualLocked = false;
+        this.turnTouched = false;
+        this.paused = false;
+        this.aiThinking = false;
+        this.animating = false;
+        this.anim = null; // { player, label, path, from, startTime, duration }
+
+        this.selected = null;
+        this.targets = new Map(); // to -> path
+
+        this.countdownTimer = null;
+        this.deadline = 0;
+        this.token = 0;
+
+        this.IDLE_SECONDS = 5.0;
+        this.MAX_PLIES_PER_PLAYER = 200;
+        this.STALL_PLIES_PER_PLAYER = 30;
+
+        this.initEvents();
+        this.resizeCanvas();
+        window.addEventListener("resize", () => this.resizeCanvas());
+
+        this.openSettingsModal();
+      }
+
+      initEvents() {
+        this.btnPause.addEventListener("click", () => this.togglePause());
+        this.btnNewGame.addEventListener("click", () => this.openSettingsModal());
+
+        this.btnCancelSettings.addEventListener("click", () => {
+          if (this.state) this.settingsModal.classList.remove("active");
+        });
+
+        this.btnStartGame.addEventListener("click", () => {
+          this.readSettingsForm();
+          this.settingsModal.classList.remove("active");
+          this.startGame();
+        });
+
+        this.btnGameoverClose.addEventListener("click", () => {
+          this.gameoverModal.classList.remove("active");
+        });
+
+        this.btnGameoverRestart.addEventListener("click", () => {
+          this.gameoverModal.classList.remove("active");
+          this.openSettingsModal();
+        });
+
+        // プレイヤー人数切り替え時のフォーム更新
+        const updatePlayerLabels = () => {
+          const n = parseInt(document.querySelector("input[name='num-players']:checked").value, 10);
+          const camps = PLAYER_CAMPS[n];
+          const rowP3 = document.getElementById("row-p3");
+          rowP3.style.display = n === 3 ? "flex" : "none";
+
+          for (let i = 0; i < n; i++) {
+            const labelSpan = document.querySelector(`#row-p${i + 1} > span`);
+            if (labelSpan) {
+              const campKey = camps[i];
+              labelSpan.textContent = `Player ${i + 1} (${PIECE_COLOR_NAMES[i]}駒 / ${CAMP_NAMES[campKeyStr(campKey)]}陣地):`;
+            }
+          }
+        };
+
+        document.querySelectorAll("input[name='num-players']").forEach(radio => {
+          radio.addEventListener("change", updatePlayerLabels);
+        });
+        updatePlayerLabels();
+
+        // Canvas クリック / タップ
+        const handlePointer = (clientX, clientY) => {
+          const rect = this.canvas.getBoundingClientRect();
+          const scaleX = this.canvas.width / rect.width;
+          const scaleY = this.canvas.height / rect.height;
+          const x = (clientX - rect.left) * scaleX;
+          const y = (clientY - rect.top) * scaleY;
+          this.onBoardClick(x, y);
+        };
+
+        this.canvas.addEventListener("click", (e) => {
+          handlePointer(e.clientX, e.clientY);
+        });
+
+        this.canvas.addEventListener("touchstart", (e) => {
+          if (e.touches.length === 1) {
+            e.preventDefault();
+            const t = e.touches[0];
+            handlePointer(t.clientX, t.clientY);
+          }
+        }, { passive: false });
+      }
+
+      openSettingsModal() {
+        this.settingsModal.classList.add("active");
+      }
+
+      readSettingsForm() {
+        const numPlayers = parseInt(document.querySelector("input[name='num-players']:checked").value, 10);
+        const kinds = [
+          document.getElementById("kind-p1").value,
+          document.getElementById("kind-p2").value
+        ];
+        if (numPlayers === 3) {
+          kinds.push(document.getElementById("kind-p3").value);
+        }
+        const difficulty = document.querySelector("input[name='difficulty']:checked").value;
+        const forbidGoalExit = document.getElementById("chk-exit").checked;
+        const antiSpoil = document.getElementById("chk-anti-spoil").checked;
+
+        this.config = {
+          numPlayers,
+          kinds,
+          difficulty,
+          forbidGoalExit,
+          antiSpoil
+        };
+      }
+
+      resizeCanvas() {
+        const dpr = window.devicePixelRatio || 1;
+        const rect = this.wrapper.getBoundingClientRect();
+        this.canvas.width = Math.round(rect.width * dpr);
+        this.canvas.height = Math.round(rect.height * dpr);
+        this.draw();
+      }
+
+      getLayout() {
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+        const dpr = window.devicePixelRatio || 1;
+        const topMargin = 50 * dpr;
+        const bottomMargin = 40 * dpr;
+        const availH = h - topMargin - bottomMargin;
+        const scale = Math.min(w / (2 * 6.0 + 1.6), availH / (2 * 8 * SQRT3_2 + 1.6));
+        const cx = w / 2.0;
+        const cy = topMargin + availH / 2.0;
+        return { scale, cx, cy, dpr };
+      }
+
+      nodeXY(i, layout = null) {
+        const { scale, cx, cy } = layout || this.getLayout();
+        const [q, r] = GEO.nodes[i];
+        const [x, y] = Geometry.toXY(q, r, scale);
+        return [cx + x, cy + y];
+      }
+
+      axialXY(q, r, layout) {
+        const { scale, cx, cy } = layout;
+        const [x, y] = Geometry.toXY(q, r, scale);
+        return [cx + x, cy + y];
+      }
+
+      nodeAt(px, py) {
+        const layout = this.getLayout();
+        const bestD = 0.48 * layout.scale;
+        let best = -1;
+        let minDist = bestD;
+        for (let i = 0; i < GEO.n; i++) {
+          const [nx, ny] = this.nodeXY(i, layout);
+          const d = Math.hypot(nx - px, ny - py);
+          if (d < minDist) {
+            minDist = d;
+            best = i;
+          }
+        }
+        return best;
+      }
+
+      startGame() {
+        this.cancelPending();
+        const conf = this.config;
+        const players = PLAYER_CAMPS[conf.numPlayers].map((k, i) => new PlayerInfo(i, k));
+
+        const board = new Array(GEO.n).fill(-1);
+        const labels = new Array(GEO.n).fill(0);
+        const pos = players.map(() => new Set());
+
+        for (const p of players) {
+          const order = p.start.slice().sort((a, b) => p.progress[a] - p.progress[b]);
+          order.forEach((node, idx) => {
+            board[node] = p.idx;
+            labels[node] = idx + 1;
+            pos[p.idx].add(node);
+          });
+        }
+
+        this.state = {
+          config: conf,
+          players,
+          board,
+          labels,
+          pos,
+          current: 0,
+          ply: 0,
+          history: [],
+          winner: null,
+          bestInGoal: new Array(players.length).fill(0),
+          lastProgressPly: 0
+        };
+
+        this.autoMode = new Array(conf.numPlayers).fill(false);
+        this.manualLocked = false;
+        this.paused = false;
+        this.btnPause.textContent = "一時停止";
+        this.selected = null;
+        this.targets.clear();
+        this.anim = null;
+
+        this.engines = [];
+        for (let i = 0; i < conf.numPlayers; i++) {
+          const diff = conf.kinds[i] === "ai" ? conf.difficulty : "hard";
+          this.engines.push(new AIEngine(players, conf.forbidGoalExit, diff, conf.antiSpoil));
+        }
+
+        const kindsText = conf.kinds.map((k, i) => `P${i + 1}:${k === "human" ? "人間" : "AI"}`).join(" / ");
+        this.statusBar.textContent = `新しいゲーム開始: ${conf.numPlayers}人対戦 (${kindsText}) 難易度:${conf.difficulty === "easy" ? "初級" : "上級"}`;
+
+        this.draw();
+        setTimeout(() => this.beginTurn(), 300);
+      }
+
+      cancelPending() {
+        this.token++;
+        this.aiThinking = false;
+        this.animating = false;
+        this.anim = null;
+        if (this.countdownTimer) {
+          clearInterval(this.countdownTimer);
+          this.countdownTimer = null;
+        }
+      }
+
+      isHuman(p) {
+        return this.state.config.kinds[p] === "human";
+      }
+
+      legalMoves(p, withPaths = true) {
+        const st = this.state;
+        return generateMoves(st.board, st.pos[p], st.players[p].goal, st.config.forbidGoalExit, withPaths);
+      }
+
+      beginTurn() {
+        const st = this.state;
+        if (!st || st.winner !== null || this.animating || this.aiThinking) return;
+
+        const p = st.current;
+        this.selected = null;
+        this.targets.clear();
+        this.turnTouched = false;
+
+        if (st.ply >= this.MAX_PLIES_PER_PLAYER * st.players.length) {
+          this.finishGame(null, `${st.ply}手経過したため引き分けです。`);
+          return;
+        }
+
+        if (st.ply - st.lastProgressPly >= this.STALL_PLIES_PER_PLAYER * st.players.length) {
+          this.finishGame(null, `ゴール到達数が${st.ply - st.lastProgressPly}手のあいだ伸びず膠着したため引き分けです。`);
+          return;
+        }
+
+        const moves = this.legalMoves(p, false);
+        if (moves.length === 0) {
+          this.statusBar.textContent = `P${p + 1} は合法手がないためパスします。`;
+          st.current = (st.current + 1) % st.players.length;
+          setTimeout(() => this.beginTurn(), 400);
+          return;
+        }
+
+        this.updateHeader();
+        if (this.paused) return;
+
+        if (!this.isHuman(p)) {
+          this.requestAI(p);
+        } else if (this.autoMode[p] && !this.manualLocked) {
+          this.requestAI(p);
+        } else if (!this.manualLocked) {
+          this.startCountdown();
+        }
+        this.draw();
+      }
+
+      startCountdown() {
+        if (this.countdownTimer) clearInterval(this.countdownTimer);
+        this.deadline = performance.now() + this.IDLE_SECONDS * 1000;
+        this.countdownTimer = setInterval(() => {
+          if (!this.state || this.paused) return;
+          const remain = Math.max(0, Math.ceil((this.deadline - performance.now()) / 1000));
+          if (performance.now() >= this.deadline) {
+            clearInterval(this.countdownTimer);
+            this.countdownTimer = null;
+            const p = this.state.current;
+            if (!this.manualLocked && !this.turnTouched) {
+              this.autoMode[p] = true;
+              this.statusBar.textContent = `5秒間操作がなかったため、P${p + 1} を自動操作モードに切り替えました。`;
+              this.selected = null;
+              this.targets.clear();
+              this.requestAI(p);
+            }
+          }
+          this.updateHeader();
+        }, 100);
+        this.updateHeader();
+      }
+
+      updateHeader() {
+        const st = this.state;
+        if (!st) return;
+        const p = st.current;
+        const who = this.isHuman(p) ? "人間" : "AI";
+        this.turnDot.style.backgroundColor = PIECE_COLORS[p];
+        this.turnText.textContent = `手番: P${p + 1} (${PIECE_COLOR_NAMES[p]}駒 / ${CAMP_NAMES[campKeyStr(st.players[p].startKey)]}陣地 → ${CAMP_NAMES[campKeyStr(st.players[p].goalKey)]}) — ${who} ｜ ${st.ply + 1}手目`;
+
+        this.timerBadge.className = "timer-badge";
+        if (this.paused) {
+          this.timerBadge.textContent = "一時停止中";
+        } else if (this.isHuman(p) && this.autoMode[p] && !this.manualLocked) {
+          this.timerBadge.textContent = "自動操作中 (クリックで手動復帰)";
+          this.timerBadge.classList.add("auto-mode");
+        } else if (this.isHuman(p) && this.countdownTimer) {
+          const remain = Math.max(0, Math.ceil((this.deadline - performance.now()) / 1000));
+          this.timerBadge.textContent = `残り ${remain}秒...`;
+          this.timerBadge.classList.add("warning");
+        } else if (this.isHuman(p) && this.manualLocked) {
+          this.timerBadge.textContent = "手動操作モード";
+        } else if (this.isHuman(p)) {
+          this.timerBadge.textContent = "操作中";
+        } else if (this.aiThinking) {
+          this.timerBadge.textContent = "AI思考中...";
+        } else {
+          this.timerBadge.textContent = "";
+        }
+      }
+
+      requestAI(p) {
+        this.aiThinking = true;
+        this.updateHeader();
+        const token = ++this.token;
+
+        // 非同期に実行してUIの固まりを防止
+        setTimeout(() => {
+          if (token !== this.token) return;
+          const st = this.state;
+          const lastMove = st.history.length > 0 ? st.history[st.history.length - 1] : null;
+          const move = this.engines[p].choose(st.board, st.pos, p, lastMove);
+
+          setTimeout(() => {
+            if (token !== this.token) return;
+            this.aiThinking = false;
+            if (this.paused) {
+              this.updateHeader();
+              return;
+            }
+            if (!move) {
+              st.current = (st.current + 1) % st.players.length;
+              this.beginTurn();
+              return;
+            }
+            if (this.isHuman(p) && (this.manualLocked || !this.autoMode[p])) {
+              this.beginTurn();
+              return;
+            }
+            const [f, t, path] = move;
+            this.startMove(p, f, t, path);
+          }, 350);
+        }, 30);
+      }
+
+      onBoardClick(x, y) {
+        const st = this.state;
+        if (!st || st.winner !== null) return;
+
+        // 自動操作中のクリック → 自動操作を即時解除し、以後ずっと手動操作
+        if (this.autoMode.some(Boolean) && !this.manualLocked) {
+          this.manualLocked = true;
+          this.autoMode = new Array(this.autoMode.length).fill(false);
+          this.statusBar.textContent = "手動操作に復帰しました。以後は自動操作に切り替わりません。";
+          if (this.isHuman(st.current) && this.aiThinking) {
+            this.token++;
+            this.aiThinking = false;
+          }
+        }
+
+        const p = st.current;
+        if (!this.isHuman(p) || this.animating || this.aiThinking || this.paused) {
+          this.updateHeader();
+          return;
+        }
+
+        const node = this.nodeAt(x, y);
+
+        // 操作があったのでタイマー停止
+        this.turnTouched = true;
+        if (this.countdownTimer) {
+          clearInterval(this.countdownTimer);
+          this.countdownTimer = null;
+        }
+
+        if (node !== -1 && this.targets.has(node)) {
+          const path = this.targets.get(node);
+          const f = this.selected;
+          this.selected = null;
+          this.targets.clear();
+          this.startMove(p, f, node, path);
+          return;
+        }
+
+        if (node >= 0 && st.board[node] === p) {
+          this.selected = node;
+          this.targets.clear();
+          const allMoves = this.legalMoves(p, true);
+          for (const [f, t, path] of allMoves) {
+            if (f === node) {
+              this.targets.set(t, path);
+            }
+          }
+          if (this.targets.size === 0) {
+            this.statusBar.textContent = "その駒は動かせません。";
+          } else {
+            this.statusBar.textContent = `P${p + 1} の駒 ${st.labels[node]} を選択 (移動可能先: ${this.targets.size}箇所)`;
+          }
+        } else {
+          this.selected = null;
+          this.targets.clear();
+        }
+
+        this.updateHeader();
+        this.draw();
+      }
+
+      startMove(p, f, t, path) {
+        this.animating = true;
+        const segs = path.length - 1;
+        const duration = (0.16 * segs + 0.05) * 1000;
+        this.anim = {
+          player: p,
+          label: this.state.labels[f],
+          path: path.slice(),
+          from: f,
+          startTime: performance.now(),
+          duration
+        };
+        this.updateHeader();
+        this.runAnimation();
+      }
+
+      runAnimation() {
+        const frame = () => {
+          if (!this.anim) return;
+          const elapsed = performance.now() - this.anim.startTime;
+          const u = Math.min(elapsed / this.anim.duration, 1.0);
+
+          this.draw(u);
+
+          if (u >= 1.0) {
+            const a = this.anim;
+            this.anim = null;
+            this.animating = false;
+            this.finishMove(a.player, a.path[0], a.path[a.path.length - 1], a.path);
+          } else {
+            requestAnimationFrame(frame);
+          }
+        };
+        requestAnimationFrame(frame);
+      }
+
+      finishMove(p, f, t, path) {
+        const st = this.state;
+        st.board[f] = -1;
+        st.board[t] = p;
+        st.labels[t] = st.labels[f];
+        st.labels[f] = 0;
+        st.pos[p].delete(f);
+        st.pos[p].add(t);
+        st.history.push([p, f, t, path.slice()]);
+        st.ply++;
+
+        let inGoal = 0;
+        for (const n of st.pos[p]) {
+          if (st.players[p].goal.has(n)) inGoal++;
+        }
+        if (inGoal > st.bestInGoal[p]) {
+          st.bestInGoal[p] = inGoal;
+          st.lastProgressPly = st.ply;
+        }
+
+        const isStep = path.length === 2 && this.isStepAdjacent(f, t);
+        const moveType = isStep ? "ステップ" : `ジャンプ×${path.length - 1}`;
+        this.statusBar.textContent = `P${p + 1}: 駒${st.labels[t]} ${moveType} [${GEO.nodes[f]}] → [${GEO.nodes[t]}]`;
+
+        if (isWinner(st.board, st.pos, st.players, p, st.config.antiSpoil)) {
+          st.winner = p;
+          this.draw();
+          this.finishGame(p);
+          return;
+        }
+
+        st.current = (st.current + 1) % st.players.length;
+        this.beginTurn();
+      }
+
+      isStepAdjacent(f, t) {
+        const [q1, r1] = GEO.nodes[f];
+        const [q2, r2] = GEO.nodes[t];
+        const dq = q2 - q1;
+        const dr = r2 - r1;
+        return DIRECTIONS.some(([x, y]) => x === dq && y === dr);
+      }
+
+      finishGame(winner, drawMsg = "") {
+        if (this.countdownTimer) {
+          clearInterval(this.countdownTimer);
+          this.countdownTimer = null;
+        }
+        let msg = "";
+        if (winner === null) {
+          this.state.winner = -1;
+          msg = drawMsg;
+        } else {
+          msg = `Player ${winner + 1} (${PIECE_COLOR_NAMES[winner]}駒) の勝利です！ (${this.state.ply}手)`;
+        }
+        this.turnText.textContent = `ゲーム終了 — ${msg}`;
+        this.timerBadge.textContent = "";
+        this.statusBar.textContent = msg;
+
+        this.gameoverTitle.textContent = winner === null ? "引き分け" : "勝者決定！";
+        this.gameoverMsg.textContent = msg;
+        this.gameoverModal.classList.add("active");
+      }
+
+      togglePause() {
+        if (!this.state || this.state.winner !== null) return;
+        this.paused = !this.paused;
+        this.btnPause.textContent = this.paused ? "再開" : "一時停止";
+        if (this.paused) {
+          if (this.countdownTimer) {
+            clearInterval(this.countdownTimer);
+            this.countdownTimer = null;
+          }
+          this.updateHeader();
+        } else {
+          if (!this.aiThinking && !this.animating) {
+            this.beginTurn();
+          }
+          this.updateHeader();
+        }
+      }
+
+      /* -------------------------------------------------------------------------
+       * 描画システム (Canvas 2D)
+       * ------------------------------------------------------------------------- */
+      draw(animProgress = 0) {
+        const ctx = this.ctx;
+        const layout = this.getLayout();
+        const { scale, dpr } = layout;
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+
+        ctx.clearRect(0, 0, w, h);
+
+        // 背景ボード
+        ctx.fillStyle = COLOR_BG;
+        ctx.beginPath();
+        ctx.roundRect(0, 0, w, h, 16 * dpr);
+        ctx.fill();
+
+        // ボードタイトル
+        ctx.fillStyle = "#2e1a0f";
+        ctx.font = `bold ${Math.round(15 * dpr)}px 'Hiragino Sans', 'Meiryo UI', sans-serif`;
+        ctx.textAlign = "center";
+        ctx.fillText("ダイヤモンドゲーム (121ノード / R=L=4)", w / 2, 26 * dpr);
+
+        ctx.fillStyle = "#5c3a21";
+        ctx.font = `${Math.round(11 * dpr)}px 'Hiragino Sans', 'Meiryo UI', sans-serif`;
+        ctx.fillText("Spec v1.2 : 各プレイヤー15駒 (キャンプ10 + 基底辺5)", w / 2, 44 * dpr);
+
+        // 中央正六角形 (白)
+        const hexCorners = Geometry.hexagonCorners().map(([q, r]) => this.axialXY(q, r, layout));
+        ctx.fillStyle = COLOR_HEX;
+        ctx.strokeStyle = COLOR_HEX;
+        ctx.lineWidth = Math.max(3.0 * dpr, scale * 0.28);
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        hexCorners.forEach(([x, y], idx) => {
+          if (idx === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // 6つの三角キャンプ
+        for (const key of CAMP_KEYS) {
+          const triPts = Geometry.campTriangle(key).map(([q, r]) => this.axialXY(q, r, layout));
+          ctx.fillStyle = CAMP_COLORS[campKeyStr(key)];
+          ctx.beginPath();
+          triPts.forEach(([x, y], idx) => {
+            if (idx === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          });
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        // グリッド線
+        ctx.strokeStyle = "rgba(51, 51, 51, 0.4)";
+        ctx.lineWidth = Math.max(1.0, 1.0 * dpr);
+        for (const [i, j] of GEO.edges) {
+          const [x1, y1] = this.nodeXY(i, layout);
+          const [x2, y2] = this.nodeXY(j, layout);
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+        }
+
+        // 直前の手の軌跡 (点線)
+        const st = this.state;
+        if (st && st.history.length > 0 && !this.anim) {
+          const [player, _f, _t, path] = st.history[st.history.length - 1];
+          ctx.strokeStyle = PIECE_COLORS[player] + "88";
+          ctx.lineWidth = Math.max(2.5 * dpr, scale * 0.1);
+          ctx.setLineDash([6 * dpr, 4 * dpr]);
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          path.forEach((node, idx) => {
+            const [x, y] = this.nodeXY(node, layout);
+            if (idx === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          });
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        // 空ノード (丸穴)
+        const nr = Math.max(3.0 * dpr, scale * 0.16);
+        ctx.fillStyle = COLOR_NODE;
+        for (let i = 0; i < GEO.n; i++) {
+          const [nx, ny] = this.nodeXY(i, layout);
+          ctx.beginPath();
+          ctx.arc(nx, ny, nr, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // 移動可能先ハイライト
+        if (this.targets.size > 0) {
+          const tr = scale * 0.28;
+          ctx.fillStyle = "rgba(16, 185, 129, 0.75)";
+          ctx.strokeStyle = "#ffffff";
+          ctx.lineWidth = 2 * dpr;
+          for (const targetNode of this.targets.keys()) {
+            const [tx, ty] = this.nodeXY(targetNode, layout);
+            ctx.beginPath();
+            ctx.arc(tx, ty, tr, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+          }
+        }
+
+        // 駒の描画
+        if (st) {
+          const pr = scale * 0.40;
+          for (let i = 0; i < GEO.n; i++) {
+            const p = st.board[i];
+            if (p < 0) continue;
+            if (this.anim && i === this.anim.from) continue;
+            const [x, y] = this.nodeXY(i, layout);
+            this.drawPiece(ctx, x, y, pr, p, st.labels[i], i === this.selected, dpr);
+          }
+
+          // アニメーション中の駒
+          if (this.anim) {
+            const pt = this.getAnimPoint(animProgress, layout);
+            this.drawPiece(ctx, pt.x, pt.y, pr * 1.08, this.anim.player, this.anim.label, true, dpr);
+          }
+        }
+
+        // 凡例
+        this.drawLegend(ctx, layout);
+      }
+
+      getAnimPoint(u, layout) {
+        const path = this.anim.path;
+        const segs = path.length - 1;
+        const t = Math.min(u, 1.0) * segs;
+        const k = Math.min(Math.floor(t), segs - 1);
+        const subU = t - k;
+
+        const [x1, y1] = this.nodeXY(path[k], layout);
+        const [x2, y2] = this.nodeXY(path[k + 1], layout);
+
+        let x = x1 + (x2 - x1) * subU;
+        let y = y1 + (y2 - y1) * subU;
+
+        // ジャンプ時は山なりの放物線
+        if (path.length > 2 || !this.isStepAdjacent(path[0], path[1])) {
+          y -= Math.sin(subU * Math.PI) * layout.scale * 0.38;
+        }
+        return { x, y };
+      }
+
+      drawPiece(ctx, x, y, radius, player, label, isSelected, dpr) {
+        const color = PIECE_COLORS[player];
+
+        // 影
+        ctx.fillStyle = "rgba(0, 0, 0, 0.28)";
+        ctx.beginPath();
+        ctx.arc(x + radius * 0.12, y + radius * 0.16, radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 駒本体（球体グラデーション）
+        const grad = ctx.createRadialGradient(
+          x - radius * 0.35, y - radius * 0.4, radius * 0.1,
+          x, y, radius
+        );
+        grad.addColorStop(0, "#ffffff");
+        grad.addColorStop(0.25, color);
+        grad.addColorStop(1, this.shadeColor(color, -40));
+
+        ctx.fillStyle = grad;
+        ctx.strokeStyle = isSelected ? "#fde047" : "#ffffff";
+        ctx.lineWidth = isSelected ? 3.5 * dpr : 1.8 * dpr;
+
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // 番号
+        ctx.fillStyle = "#ffffff";
+        ctx.font = `bold ${Math.max(9, Math.round(radius * 0.95))}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(label.toString(), x, y + 1);
+      }
+
+      drawLegend(ctx, layout) {
+        const st = this.state;
+        if (!st) return;
+        const { dpr } = layout;
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+
+        let fontSize = Math.round(10 * dpr);
+        ctx.font = `${fontSize}px 'Hiragino Sans', 'Meiryo UI', sans-serif`;
+        ctx.textBaseline = "middle";
+
+        const items = st.players.map(p => ({
+          color: PIECE_COLORS[p.idx],
+          text: `P${p.idx + 1}: 15個 (${CAMP_NAMES[campKeyStr(p.startKey)]}10+基底5 → ${CAMP_NAMES[campKeyStr(p.goalKey)]})`
+        }));
+
+        let totalWidth = items.reduce((sum, item) => sum + ctx.measureText(item.text).width + 24 * dpr, 0) + (items.length - 1) * 12 * dpr;
+
+        // 幅が足りない場合はフォント縮小
+        if (totalWidth > w - 20 * dpr) {
+          fontSize = Math.max(8 * dpr, Math.round(8.5 * dpr));
+          ctx.font = `${fontSize}px 'Hiragino Sans', 'Meiryo UI', sans-serif`;
+          totalWidth = items.reduce((sum, item) => sum + ctx.measureText(item.text).width + 20 * dpr, 0) + (items.length - 1) * 8 * dpr;
+        }
+
+        const gap = 10 * dpr;
+        let currX = Math.max(10 * dpr, (w - totalWidth) / 2);
+        const y = h - 16 * dpr;
+
+        items.forEach((item) => {
+          const tw = ctx.measureText(item.text).width + 20 * dpr;
+          ctx.fillStyle = item.color;
+          ctx.strokeStyle = "#ffffff";
+          ctx.lineWidth = 1.5 * dpr;
+          ctx.beginPath();
+          ctx.arc(currX + 6 * dpr, y, 5 * dpr, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = "#2e1a0f";
+          ctx.textAlign = "left";
+          ctx.fillText(item.text, currX + 14 * dpr, y);
+
+          currX += tw + gap;
+        });
+      }
+
+      shadeColor(color, percent) {
+        let R = parseInt(color.substring(1, 3), 16);
+        let G = parseInt(color.substring(3, 5), 16);
+        let B = parseInt(color.substring(5, 7), 16);
+
+        R = Math.min(255, Math.max(0, parseInt(R * (100 + percent) / 100)));
+        G = Math.min(255, Math.max(0, parseInt(G * (100 + percent) / 100)));
+        B = Math.min(255, Math.max(0, parseInt(B * (100 + percent) / 100)));
+
+        const RR = ((R.toString(16).length === 1) ? "0" + R.toString(16) : R.toString(16));
+        const GG = ((G.toString(16).length === 1) ? "0" + G.toString(16) : G.toString(16));
+        const BB = ((B.toString(16).length === 1) ? "0" + B.toString(16) : B.toString(16));
+
+        return "#" + RR + GG + BB;
+      }
+    }
+
+    // ゲーム起動
+    window.addEventListener("DOMContentLoaded", () => {
+      new DiamondGameApp();
+    });
+  </script>
+</body>
+</html>
