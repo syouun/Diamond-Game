@@ -87,8 +87,17 @@ COLOR_NODE = "#4b2e1f"
 COLOR_TEXT_DARK = "#2e1a0f"
 COLOR_TEXT_SUB = "#5c3a21"
 
-PIECE_COLORS = ["#1d4ed8", "#b91c1c", "#16a34a"]  # P1 青 / P2 赤 / P3 緑
-PIECE_COLOR_NAMES = ["青", "赤", "緑"]
+# 駒の色は初期陣地（キャンプ）の同系色。白い番号が読めるよう濃いトーンにしている。
+PIECE_COLORS = {
+    ("x", +1): "#0284c7",  # 水色陣地 → 鮮やかな青
+    ("z", -1): "#a21caf",  # 紫陣地 → 濃い紫
+    ("y", +1): "#15803d",  # 緑陣地 → フォレストグリーン
+    ("x", -1): "#b91c1c",  # 赤陣地 → 濃い赤
+    ("z", +1): "#c2410c",  # 橙陣地 → 赤橙
+    ("y", -1): "#b45309",  # 黄陣地 → アンバー
+}
+# 駒の色名は陣地名と同じ（緑陣地 = 緑駒）
+PIECE_COLOR_NAMES = CAMP_NAMES
 
 # 人数ごとの初期陣地（P1, P2, P3 の順）。ゴールは向かい側（同じ軸・逆符号）。
 PLAYER_CAMPS = {
@@ -243,6 +252,8 @@ class PlayerInfo:
         self.idx = idx
         self.start_key = start_key
         self.goal_key = opposite(start_key)
+        self.color = PIECE_COLORS[start_key]
+        self.color_name = PIECE_COLOR_NAMES[start_key]
         self.start = GEO.region15(start_key)
         self.start_set = frozenset(self.start)
         self.goal = frozenset(GEO.region15(self.goal_key))
@@ -701,7 +712,7 @@ class BoardWidget(QWidget):
         st = self.state
         if st is not None and st.history and self.anim is None:
             player, _f, _t, path = st.history[-1]
-            c = QColor(PIECE_COLORS[player])
+            c = QColor(st.players[player].color)
             c.setAlphaF(0.55)
             pen = QPen(c, max(2.0, scale * 0.09), Qt.DashLine)
             pen.setCapStyle(Qt.RoundCap)
@@ -759,7 +770,7 @@ class BoardWidget(QWidget):
         return QPointF(x, y)
 
     def _draw_piece(self, painter, center, radius, player, label, selected):
-        base = QColor(PIECE_COLORS[player])
+        base = QColor(self.state.players[player].color)
         # 影
         painter.setPen(Qt.NoPen)
         painter.setBrush(QColor(0, 0, 0, 70))
@@ -792,7 +803,7 @@ class BoardWidget(QWidget):
         for p in st.players:
             items.append(
                 (
-                    PIECE_COLORS[p.idx],
+                    p.color,
                     "P%d駒: 15個 (%s陣地10 + 基底辺5 → %s)"
                     % (p.idx + 1, CAMP_NAMES[p.start_key], CAMP_NAMES[p.goal_key]),
                 )
@@ -962,7 +973,7 @@ class StartDialog(QDialog):
             self.combo_labels[i].setVisible(visible)
             if visible:
                 self.combo_labels[i].setText(
-                    "Player %d（%s駒 / %s陣地）:" % (i + 1, PIECE_COLOR_NAMES[i], CAMP_NAMES[camps[i]])
+                    "Player %d（%s駒 / %s陣地）:" % (i + 1, PIECE_COLOR_NAMES[camps[i]], CAMP_NAMES[camps[i]])
                 )
 
     def config(self):
@@ -1156,9 +1167,9 @@ class MainWindow(QMainWindow):
         self.turn_label.setText(
             "<span style='color:%s'>●</span> 手番: P%d（%s駒 / %s陣地 → %s）— %s　｜　%d手目"
             % (
-                PIECE_COLORS[p],
+                st.players[p].color,
                 p + 1,
-                PIECE_COLOR_NAMES[p],
+                st.players[p].color_name,
                 CAMP_NAMES[st.players[p].start_key],
                 CAMP_NAMES[st.players[p].goal_key],
                 who,
@@ -1320,7 +1331,7 @@ class MainWindow(QMainWindow):
             st.winner = -1
             msg = draw_msg
         else:
-            msg = "P%d（%s駒）の勝利です！（%d手）" % (winner + 1, PIECE_COLOR_NAMES[winner], st.ply)
+            msg = "P%d（%s駒）の勝利です！（%d手）" % (winner + 1, st.players[winner].color_name, st.ply)
         self.turn_label.setText("ゲーム終了 — " + msg)
         self.timer_label.setText("")
         self.status.showMessage(msg)

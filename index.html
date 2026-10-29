@@ -428,8 +428,8 @@
   <header>
     <div class="top-bar">
       <div class="turn-badge">
-        <span class="player-indicator-dot" id="turn-dot" style="background-color: #1d4ed8;"></span>
-        <span id="turn-text">手番: P1 (青) — 1手目</span>
+        <span class="player-indicator-dot" id="turn-dot" style="background-color: #15803d;"></span>
+        <span id="turn-text">手番: P1 (緑) — 1手目</span>
       </div>
       <div id="timer-badge" class="timer-badge">手動操作モード</div>
       <div class="button-group">
@@ -474,21 +474,21 @@
         <legend>2. 各プレイヤーの割り当て</legend>
         <div id="player-assign-container">
           <div class="player-assign-row" id="row-p1">
-            <span>Player 1 (青駒 / 緑陣地):</span>
+            <span>Player 1 (緑駒 / 緑陣地):</span>
             <select id="kind-p1">
               <option value="human">人間 (あなた)</option>
               <option value="ai">AI</option>
             </select>
           </div>
           <div class="player-assign-row" id="row-p2">
-            <span>Player 2 (赤駒 / 黄陣地):</span>
+            <span>Player 2 (黄駒 / 黄陣地):</span>
             <select id="kind-p2">
               <option value="human">人間</option>
               <option value="ai" selected>AI</option>
             </select>
           </div>
           <div class="player-assign-row" id="row-p3" style="display: none;">
-            <span>Player 3 (緑駒 / 橙陣地):</span>
+            <span>Player 3 (橙駒 / 橙陣地):</span>
             <select id="kind-p3">
               <option value="human">人間</option>
               <option value="ai" selected>AI</option>
@@ -594,8 +594,17 @@
     const COLOR_EDGE = "#333333";
     const COLOR_NODE = "#4b2e1f";
 
-    const PIECE_COLORS = ["#1d4ed8", "#b91c1c", "#16a34a"]; // P1 青 / P2 赤 / P3 緑
-    const PIECE_COLOR_NAMES = ["青", "赤", "緑"];
+    // 駒の色は初期陣地（キャンプ）の同系色。白い番号が読めるよう濃いトーンにしている。
+    const PIECE_COLORS = {
+      "x,1": "#0284c7",   // 水色陣地 → 鮮やかな青
+      "z,-1": "#a21caf",  // 紫陣地 → 濃い紫
+      "y,1": "#15803d",   // 緑陣地 → フォレストグリーン
+      "x,-1": "#b91c1c",  // 赤陣地 → 濃い赤
+      "z,1": "#c2410c",   // 橙陣地 → 赤橙
+      "y,-1": "#b45309"   // 黄陣地 → アンバー
+    };
+    // 駒の色名は陣地名と同じ（緑陣地 = 緑駒）
+    const PIECE_COLOR_NAMES = CAMP_NAMES;
 
     const PLAYER_CAMPS = {
       2: [["y", 1], ["y", -1]],
@@ -741,6 +750,8 @@
         this.idx = idx;
         this.startKey = startKey;
         this.goalKey = opposite(startKey);
+        this.color = PIECE_COLORS[campKeyStr(startKey)];
+        this.colorName = PIECE_COLOR_NAMES[campKeyStr(startKey)];
         this.start = GEO.region15(startKey);
         this.startSet = new Set(this.start);
         this.goal = new Set(GEO.region15(this.goalKey));
@@ -1187,7 +1198,7 @@
             const labelSpan = document.querySelector(`#row-p${i + 1} > span`);
             if (labelSpan) {
               const campKey = camps[i];
-              labelSpan.textContent = `Player ${i + 1} (${PIECE_COLOR_NAMES[i]}駒 / ${CAMP_NAMES[campKeyStr(campKey)]}陣地):`;
+              labelSpan.textContent = `Player ${i + 1} (${PIECE_COLOR_NAMES[campKeyStr(campKey)]}駒 / ${CAMP_NAMES[campKeyStr(campKey)]}陣地):`;
             }
           }
         };
@@ -1457,8 +1468,8 @@
         if (!st) return;
         const p = st.current;
         const who = this.isHuman(p) ? "人間" : "AI";
-        this.turnDot.style.backgroundColor = PIECE_COLORS[p];
-        this.turnText.textContent = `手番: P${p + 1} (${PIECE_COLOR_NAMES[p]}駒 / ${CAMP_NAMES[campKeyStr(st.players[p].startKey)]}陣地 → ${CAMP_NAMES[campKeyStr(st.players[p].goalKey)]}) — ${who} ｜ ${st.ply + 1}手目`;
+        this.turnDot.style.backgroundColor = st.players[p].color;
+        this.turnText.textContent = `手番: P${p + 1} (${st.players[p].colorName}駒 / ${CAMP_NAMES[campKeyStr(st.players[p].startKey)]}陣地 → ${CAMP_NAMES[campKeyStr(st.players[p].goalKey)]}) — ${who} ｜ ${st.ply + 1}手目`;
 
         this.timerBadge.className = "timer-badge";
         if (this.paused) {
@@ -1666,7 +1677,7 @@
           this.state.winner = -1;
           msg = drawMsg;
         } else {
-          msg = `Player ${winner + 1} (${PIECE_COLOR_NAMES[winner]}駒) の勝利です！ (${this.state.ply}手)`;
+          msg = `Player ${winner + 1} (${this.state.players[winner].colorName}駒) の勝利です！ (${this.state.ply}手)`;
         }
         this.turnText.textContent = `ゲーム終了 — ${msg}`;
         this.timerBadge.textContent = "";
@@ -1767,7 +1778,7 @@
         const st = this.state;
         if (st && st.history.length > 0 && !this.anim) {
           const [player, _f, _t, path] = st.history[st.history.length - 1];
-          ctx.strokeStyle = PIECE_COLORS[player] + "88";
+          ctx.strokeStyle = st.players[player].color + "88";
           ctx.lineWidth = Math.max(2.5 * dpr, scale * 0.1);
           ctx.setLineDash([6 * dpr, 4 * dpr]);
           ctx.lineCap = "round";
@@ -1849,7 +1860,7 @@
       }
 
       drawPiece(ctx, x, y, radius, player, label, isSelected, dpr) {
-        const color = PIECE_COLORS[player];
+        const color = this.state.players[player].color;
 
         // 影
         ctx.fillStyle = "rgba(0, 0, 0, 0.28)";
@@ -1895,7 +1906,7 @@
         ctx.textBaseline = "middle";
 
         const items = st.players.map(p => ({
-          color: PIECE_COLORS[p.idx],
+          color: p.color,
           text: `P${p.idx + 1}: 15個 (${CAMP_NAMES[campKeyStr(p.startKey)]}10+基底5 → ${CAMP_NAMES[campKeyStr(p.goalKey)]})`
         }));
 
